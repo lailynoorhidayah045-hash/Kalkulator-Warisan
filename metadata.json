@@ -1,0 +1,8 @@
+{
+  "name": "Simulator & Kalkulator Hukum Waris Interaktif",
+  "description": "Simulator dan kalkulator pembagian hukum waris interaktif berbasis Hukum Waris Islam (KHI & Faraid) dan Hukum Waris Perdata Barat (KUHPerdata / BW) dengan konversi kurs dinamis, visualisasi grafik, AI Legal Coach, dan ekspor laporan.",
+  "requestFramePermissions": [],
+  "majorCapabilities": [
+    "MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"
+  ]
+}
