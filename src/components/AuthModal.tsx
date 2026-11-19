@@ -37,6 +37,13 @@ export const AuthModal: React.FC<AuthModalProps> = ({
       const msg = err instanceof Error ? err.message : 'Gagal masuk dengan Google.';
       if (msg.includes('popup-closed-by-user')) {
         setErrorMsg('Jendela login Google ditutup sebelum selesai.');
+      } else if (msg.includes('auth/popup-blocked')) {
+        setErrorMsg('Pop-up login diblokir oleh browser. Izinkan pop-up untuk situs ini lalu coba lagi.');
+      } else if (msg.includes('auth/unauthorized-domain')) {
+        const currentHost = typeof window !== 'undefined' ? window.location.hostname : '';
+        setErrorMsg(
+          `Domain "${currentHost}" belum terdaftar di Authorized Domains Firebase Auth. Muat ulang halaman atau tambahkan domain ini di Firebase Console → Authentication → Settings → Authorized domains.`
+        );
       } else {
         setErrorMsg(`Login gagal: ${msg}`);
       }
