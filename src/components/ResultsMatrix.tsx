@@ -2,10 +2,12 @@ import React from 'react';
 import { Download, Printer, Info, AlertTriangle } from 'lucide-react';
 import { AppState, CalculationResult, HeirResultRow } from '../types/inheritance';
 import { formatCurrency } from '../modules/currency';
+import { AppTheme } from '../modules/themes';
 
 interface ResultsMatrixProps {
   state: AppState;
   result: CalculationResult;
+  theme: AppTheme;
   onExportCsv: () => void;
   onPrint: () => void;
 }
@@ -23,6 +25,7 @@ function getStatusClasses(tone: HeirResultRow['statusTone']): string {
 export const ResultsMatrix: React.FC<ResultsMatrixProps> = ({
   state,
   result,
+  theme,
   onExportCsv,
   onPrint,
 }) => {
@@ -30,7 +33,7 @@ export const ResultsMatrix: React.FC<ResultsMatrixProps> = ({
     <section className="print-card rounded-xl border border-slate-200 bg-white p-5 shadow-xs sm:p-6">
       <div className="flex flex-col gap-3 border-b border-slate-100 pb-4 sm:flex-row sm:items-center sm:justify-between">
         <div>
-          <h2 className="text-lg font-bold tracking-tight text-[#1e3a8a]">
+          <h2 className="text-lg font-bold tracking-tight" style={{ color: theme.primary }}>
             Matriks Hasil Pembagian Waris
           </h2>
           <p className="mt-0.5 text-xs text-slate-500">
@@ -42,15 +45,16 @@ export const ResultsMatrix: React.FC<ResultsMatrixProps> = ({
           <button
             type="button"
             onClick={onPrint}
-            className="inline-flex items-center gap-1.5 whitespace-nowrap rounded-lg border border-slate-200 bg-white px-3.5 py-2 text-xs font-semibold text-slate-700 transition-colors hover:border-[#0284c7] hover:text-[#0284c7] focus-visible:outline-2 focus-visible:outline-[#0284c7]"
+            className="inline-flex items-center gap-1.5 whitespace-nowrap rounded-lg border border-slate-200 bg-white px-3.5 py-2 text-xs font-semibold text-slate-700 transition-colors hover:bg-slate-50"
           >
-            <Printer className="h-3.5 w-3.5" />
+            <Printer className="h-3.5 w-3.5" style={{ color: theme.primary }} />
             Cetak / PDF
           </button>
           <button
             type="button"
             onClick={onExportCsv}
-            className="inline-flex items-center gap-1.5 whitespace-nowrap rounded-lg bg-[#1e3a8a] px-3.5 py-2 text-xs font-semibold text-white transition-colors hover:bg-[#172e6e] focus-visible:outline-2 focus-visible:outline-[#0284c7]"
+            className="inline-flex items-center gap-1.5 whitespace-nowrap rounded-lg px-3.5 py-2 text-xs font-semibold text-white transition-opacity hover:opacity-90"
+            style={{ backgroundColor: theme.primary }}
           >
             <Download className="h-3.5 w-3.5" />
             Unduh Excel (.csv)
@@ -64,17 +68,24 @@ export const ResultsMatrix: React.FC<ResultsMatrixProps> = ({
           className={`mt-4 flex items-start gap-2.5 rounded-lg border p-3.5 text-xs leading-relaxed ${
             result.adjustmentType === 'aul'
               ? 'border-amber-200 bg-amber-50/80 text-amber-900'
-              : result.adjustmentType === 'radd'
-              ? 'border-sky-200 bg-[#e0f2fe]/60 text-[#1e3a8a]'
               : result.adjustmentType === 'empty'
               ? 'border-slate-200 bg-slate-50 text-slate-700'
-              : 'border-sky-100 bg-sky-50/50 text-slate-700'
+              : ''
           }`}
+          style={
+            result.adjustmentType !== 'aul' && result.adjustmentType !== 'empty'
+              ? {
+                  backgroundColor: theme.tint,
+                  borderColor: theme.border,
+                  color: theme.primary,
+                }
+              : undefined
+          }
         >
           {result.adjustmentType === 'aul' ? (
             <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-amber-600" />
           ) : (
-            <Info className="mt-0.5 h-4 w-4 shrink-0 text-[#0284c7]" />
+            <Info className="mt-0.5 h-4 w-4 shrink-0" style={{ color: theme.primary }} />
           )}
           <span>{result.adjustmentNote}</span>
         </div>
@@ -130,7 +141,10 @@ export const ResultsMatrix: React.FC<ResultsMatrixProps> = ({
                   <td className="font-mono-num px-2 py-3 text-right align-top font-semibold text-slate-900">
                     {formatCurrency(row.totalAmount, state.currency)}
                   </td>
-                  <td className="font-mono-num py-3 pl-2 pr-3 text-right align-top text-xs font-medium text-[#0284c7]">
+                  <td
+                    className="font-mono-num py-3 pl-2 pr-3 text-right align-top text-xs font-medium"
+                    style={{ color: theme.primary }}
+                  >
                     {row.totalAmount > 0
                       ? formatCurrency(row.perPersonAmount, state.currency)
                       : '—'}
@@ -139,7 +153,10 @@ export const ResultsMatrix: React.FC<ResultsMatrixProps> = ({
               ))}
             </tbody>
             <tfoot>
-              <tr className="border-t-2 border-slate-200 bg-[#e0f2fe]/35 font-semibold text-[#1e3a8a]">
+              <tr
+                className="border-t-2 border-slate-200 font-semibold"
+                style={{ backgroundColor: theme.tint, color: theme.primary }}
+              >
                 <td className="py-3 pl-3 pr-2" colSpan={3}>
                   Total Harta Terdistribusi
                 </td>
@@ -149,7 +166,7 @@ export const ResultsMatrix: React.FC<ResultsMatrixProps> = ({
                 <td className="font-mono-num px-2 py-3 text-right">
                   {formatCurrency(result.totalDistributedAmount, state.currency)}
                 </td>
-                <td className="py-3 pl-2 pr-3 text-right text-xs font-normal text-slate-500">
+                <td className="py-3 pl-2 pr-3 text-right text-xs font-normal text-slate-600">
                   {state.legalSystem === 'islam' ? 'KHI & Faraid' : 'KUHPerdata'}
                 </td>
               </tr>

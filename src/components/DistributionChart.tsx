@@ -15,30 +15,35 @@ interface DistributionChartProps {
   rows: HeirResultRow[];
   currency: CurrencyCode;
   netEstate: number;
+  palette?: string[];
+  primaryColor?: string;
 }
 
-const CHART_PALETTE = [
-  '#1e3a8a', // Navy Blue
-  '#0284c7', // Sky Blue
-  '#0ea5e9', // Cerulean
-  '#2563eb', // Royal Blue
-  '#0d9488', // Teal
-  '#059669', // Emerald
-  '#3b82f6', // Blue
-  '#6366f1', // Indigo
-  '#0369a1', // Deep Sky
-  '#14b8a6', // Light Teal
+const DEFAULT_CHART_PALETTE = [
+  '#1e3a8a',
+  '#0284c7',
+  '#0ea5e9',
+  '#2563eb',
+  '#0d9488',
+  '#059669',
+  '#3b82f6',
+  '#6366f1',
+  '#0369a1',
+  '#14b8a6',
 ];
 
 export const DistributionChart: React.FC<DistributionChartProps> = ({
   rows,
   currency,
   netEstate,
+  palette = DEFAULT_CHART_PALETTE,
+  primaryColor = '#1e3a8a',
 }) => {
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const chartInstanceRef = useRef<Chart<'doughnut'> | null>(null);
 
   const receivingRows = rows.filter((r) => r.totalAmount > 0.001);
+  const activePalette = palette.length > 0 ? palette : DEFAULT_CHART_PALETTE;
 
   useEffect(() => {
     const canvas = canvasRef.current;
@@ -55,7 +60,7 @@ export const DistributionChart: React.FC<DistributionChartProps> = ({
       r.count > 1 ? `${r.label} (${r.count})` : r.label
     );
     const values = receivingRows.map((r) => Number(r.totalAmount.toFixed(2)));
-    const colors = receivingRows.map((_, i) => CHART_PALETTE[i % CHART_PALETTE.length]);
+    const colors = receivingRows.map((_, i) => activePalette[i % activePalette.length]);
 
     chartInstanceRef.current = new Chart(canvas, {
       type: 'doughnut',
@@ -104,7 +109,7 @@ export const DistributionChart: React.FC<DistributionChartProps> = ({
         chartInstanceRef.current = null;
       }
     };
-  }, [receivingRows, currency, netEstate]);
+  }, [receivingRows, currency, netEstate, activePalette]);
 
   if (receivingRows.length === 0) {
     return (
@@ -125,7 +130,10 @@ export const DistributionChart: React.FC<DistributionChartProps> = ({
         <canvas ref={canvasRef} aria-label="Grafik Distribusi Pembagian Waris" />
         <div className="pointer-events-none absolute inset-0 flex flex-col items-center justify-center text-center">
           <span className="text-[11px] font-medium text-slate-500">Harta Bersih</span>
-          <span className="font-mono-num mt-0.5 max-w-[125px] truncate text-xs font-bold text-[#1e3a8a]">
+          <span
+            className="font-mono-num mt-0.5 max-w-[125px] truncate text-xs font-bold"
+            style={{ color: primaryColor }}
+          >
             {formatCurrency(netEstate, currency)}
           </span>
         </div>
@@ -133,7 +141,7 @@ export const DistributionChart: React.FC<DistributionChartProps> = ({
 
       <div className="space-y-2.5 sm:col-span-7">
         {receivingRows.map((row, idx) => {
-          const color = CHART_PALETTE[idx % CHART_PALETTE.length];
+          const color = activePalette[idx % activePalette.length];
           const pct = (row.totalShareRatio * 100).toFixed(2);
           return (
             <div

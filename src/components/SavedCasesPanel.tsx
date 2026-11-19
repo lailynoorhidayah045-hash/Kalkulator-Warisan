@@ -1,44 +1,119 @@
 import React, { useState } from 'react';
-import { BookmarkPlus, FolderOpen, Trash2, Clock } from 'lucide-react';
+import {
+  BookmarkPlus,
+  Cloud,
+  FolderOpen,
+  LogIn,
+  Trash2,
+  Clock,
+} from 'lucide-react';
 import { SavedCase } from '../types/inheritance';
 import { formatCurrency } from '../modules/currency';
+import { AppTheme } from '../modules/themes';
 
 interface SavedCasesPanelProps {
   cases: SavedCase[];
-  onSaveCase: (name: string, notes: string) => void;
+  isAuthenticated: boolean;
+  localPendingCount: number;
+  theme: AppTheme;
+  onSaveCase: (name: string, notes: string) => Promise<void> | void;
   onLoadCase: (saved: SavedCase) => void;
-  onDeleteCase: (id: string) => void;
+  onDeleteCase: (saved: SavedCase) => Promise<void> | void;
+  onLoginClick: () => void;
+  onSyncLocalCases: () => Promise<void> | void;
 }
 
 export const SavedCasesPanel: React.FC<SavedCasesPanelProps> = ({
   cases,
+  isAuthenticated,
+  localPendingCount,
+  theme,
   onSaveCase,
   onLoadCase,
   onDeleteCase,
+  onLoginClick,
+  onSyncLocalCases,
 }) => {
   const [caseName, setCaseName] = useState('');
   const [caseNotes, setCaseNotes] = useState('');
+  const [saving, setSaving] = useState(false);
   const [feedback, setFeedback] = useState<string | null>(null);
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    onSaveCase(caseName, caseNotes);
-    setCaseName('');
-    setCaseNotes('');
-    setFeedback('Kasus berhasil disimpan ke browser (localStorage).');
-    window.setTimeout(() => setFeedback(null), 3000);
+    setSaving(true);
+    try {
+      await onSaveCase(caseName, caseNotes);
+      setCaseName('');
+      setCaseNotes('');
+      setFeedback(
+        isAuthenticated
+          ? 'Kasus berhasil disimpan langsung ke Database Firestore.'
+          : 'Kasus disimpan sementara di browser. Login Google untuk menyimpan ke Database.'
+      );
+      window.setTimeout(() => setFeedback(null), 4000);
+    } finally {
+      setSaving(false);
+    }
   };
 
   return (
     <section className="no-print rounded-xl border border-slate-200 bg-white p-5 shadow-xs sm:p-6">
-      <div className="border-b border-slate-100 pb-3.5">
-        <h2 className="text-base font-bold text-[#1e3a8a]">
-          Riwayat &amp; Simpan Kasus (LocalStorage)
-        </h2>
-        <p className="mt-0.5 text-xs text-slate-500">
-          Simpan skenario pembagian waris secara lokal di browser untuk dimuat ulang kapan saja.
-        </p>
+      <div className="flex flex-col gap-2 border-b border-slate-100 pb-3.5 sm:flex-row sm:items-center sm:justify-between">
+        <div>
+          <h2 className="text-base font-bold" style={{ color: theme.primary }}>
+            Riwayat &amp; Simpan Kasus {isAuthenticated ? '(Database Firestore)' : '(Lokal / Draft)'}
+          </h2>
+          <p className="mt-0.5 text-xs text-slate-500">
+            {isAuthenticated
+              ? 'Semua kasus yang disimpan otomatis masuk ke database Firestore Anda.'
+              : 'Login dengan akun Google agar seluruh kasus tersimpan permanen di database.'}
+          </p>
+        </div>
+        {!isAuthenticated ? (
+          <button
+            type="button"
+            onClick={onLoginClick}
+            className="inline-flex items-center gap-1.5 self-start whitespace-nowrap rounded-lg border px-3 py-1.5 text-xs font-semibold transition-opacity hover:opacity-90 sm:self-center"
+            style={{
+              backgroundColor: theme.tint,
+              borderColor: theme.border,
+              color: theme.primary,
+            }}
+          >
+            <LogIn className="h-3.5 w-3.5" style={{ color: theme.primary }} />
+            Login Google (Sync DB)
+          </button>
+        ) : (
+          <span className="inline-flex items-center gap-1.5 self-start text-xs font-semibold text-emerald-700 sm:self-center">
+            <Cloud className="h-4 w-4" />
+            Terhubung ke Database
+          </span>
+        )}
       </div>
+
+      {isAuthenticated && localPendingCount > 0 && (
+        <div
+          className="mt-3 flex flex-wrap items-center justify-between gap-2 rounded-lg border px-3.5 py-2.5 text-xs"
+          style={{
+            backgroundColor: theme.tint,
+            borderColor: theme.border,
+            color: theme.primary,
+          }}
+        >
+          <span>
+            Terdapat <strong>{localPendingCount}</strong> kasus lokal di browser yang belum masuk ke database Firestore.
+          </span>
+          <button
+            type="button"
+            onClick={() => void onSyncLocalCases()}
+            className="rounded-md px-3 py-1.5 text-xs font-semibold text-white transition-opacity hover:opacity-90"
+            style={{ backgroundColor: theme.primary }}
+          >
+            Kirim ke Database Sekarang
+          </button>
+        </div>
+      )}
 
       <form onSubmit={handleSubmit} className="mt-4 space-y-2.5">
         <div className="grid grid-cols-1 gap-2.5 sm:grid-cols-2">
@@ -47,23 +122,25 @@ export const SavedCasesPanel: React.FC<SavedCasesPanelProps> = ({
             value={caseName}
             onChange={(e) => setCaseName(e.target.value)}
             placeholder="Nama kasus (misal: Keluarga Bpk. Ahmad)"
-            className="h-10 rounded-lg border border-slate-300 bg-white px-3 text-sm text-slate-900 placeholder:text-slate-400 focus:border-[#0284c7] focus:outline-none focus:ring-2 focus:ring-[#0284c7]/20"
+            className="h-10 rounded-lg border border-slate-300 bg-white px-3 text-sm text-slate-900 placeholder:text-slate-400 focus:outline-none focus:ring-2"
           />
           <input
             type="text"
             value={caseNotes}
             onChange={(e) => setCaseNotes(e.target.value)}
             placeholder="Catatan singkat (opsional)"
-            className="h-10 rounded-lg border border-slate-300 bg-white px-3 text-sm text-slate-900 placeholder:text-slate-400 focus:border-[#0284c7] focus:outline-none focus:ring-2 focus:ring-[#0284c7]/20"
+            className="h-10 rounded-lg border border-slate-300 bg-white px-3 text-sm text-slate-900 placeholder:text-slate-400 focus:outline-none focus:ring-2"
           />
         </div>
         <div className="flex flex-wrap items-center justify-between gap-2">
           <button
             type="submit"
-            className="inline-flex h-10 items-center gap-1.5 whitespace-nowrap rounded-lg bg-[#1e3a8a] px-4 text-xs font-semibold text-white transition-colors hover:bg-[#172e6e] focus-visible:outline-2 focus-visible:outline-[#0284c7]"
+            disabled={saving}
+            className="inline-flex h-10 items-center gap-1.5 whitespace-nowrap rounded-lg px-4 text-xs font-semibold text-white transition-opacity hover:opacity-90 disabled:opacity-60"
+            style={{ backgroundColor: theme.primary }}
           >
             <BookmarkPlus className="h-4 w-4" />
-            Simpan Kasus Saat Ini
+            {saving ? 'Menyimpan...' : 'Simpan Kasus Saat Ini'}
           </button>
           {feedback && (
             <span className="text-xs font-medium text-emerald-700">{feedback}</span>
@@ -110,9 +187,11 @@ export const SavedCasesPanel: React.FC<SavedCasesPanelProps> = ({
                       </div>
                     )}
                     <div className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-0.5 text-[11px] text-slate-500">
+                      <span>{item.source === 'firestore' ? 'Firestore DB' : 'Lokal'}</span>
+                      <span aria-hidden="true">·</span>
                       <span>{sysText}</span>
                       <span aria-hidden="true">·</span>
-                      <span className="font-mono-num font-medium text-[#1e3a8a]">
+                      <span className="font-mono-num font-medium" style={{ color: theme.primary }}>
                         {formatCurrency(item.netEstateSnapshot, item.state.currency)}
                       </span>
                       <span aria-hidden="true">·</span>
@@ -127,14 +206,19 @@ export const SavedCasesPanel: React.FC<SavedCasesPanelProps> = ({
                     <button
                       type="button"
                       onClick={() => onLoadCase(item)}
-                      className="inline-flex items-center gap-1 whitespace-nowrap rounded-lg border border-[#0284c7] bg-white px-3 py-1.5 text-xs font-semibold text-[#0284c7] transition-colors hover:bg-[#e0f2fe]"
+                      className="inline-flex items-center gap-1 whitespace-nowrap rounded-lg border px-3 py-1.5 text-xs font-semibold transition-opacity hover:opacity-90"
+                      style={{
+                        backgroundColor: theme.tint,
+                        borderColor: theme.border,
+                        color: theme.primary,
+                      }}
                     >
                       <FolderOpen className="h-3.5 w-3.5" />
                       Muat
                     </button>
                     <button
                       type="button"
-                      onClick={() => onDeleteCase(item.id)}
+                      onClick={() => void onDeleteCase(item)}
                       aria-label={`Hapus kasus ${item.name}`}
                       className="inline-flex items-center justify-center rounded-lg border border-slate-200 bg-white p-1.5 text-slate-500 transition-colors hover:border-red-200 hover:bg-red-50 hover:text-red-600"
                     >

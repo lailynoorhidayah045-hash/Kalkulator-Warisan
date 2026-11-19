@@ -7,10 +7,12 @@ import {
   HEIR_METADATA,
   HeirKey,
 } from '../types/inheritance';
+import { AppTheme } from '../modules/themes';
 
 interface FamilyCompositionPanelProps {
   family: FamilyCounts;
   deceasedGender: DeceasedGender;
+  theme: AppTheme;
   onChangeCount: (key: HeirKey, nextValue: number) => void;
   onResetFamily: () => void;
 }
@@ -18,6 +20,7 @@ interface FamilyCompositionPanelProps {
 export const FamilyCompositionPanel: React.FC<FamilyCompositionPanelProps> = ({
   family,
   deceasedGender,
+  theme,
   onChangeCount,
   onResetFamily,
 }) => {
@@ -27,7 +30,7 @@ export const FamilyCompositionPanel: React.FC<FamilyCompositionPanelProps> = ({
     <section className="no-print rounded-xl border border-slate-200 bg-white p-5 shadow-xs sm:p-6">
       <div className="flex items-center justify-between gap-3 border-b border-slate-100 pb-3.5">
         <div>
-          <h2 className="text-base font-bold text-[#1e3a8a]">
+          <h2 className="text-base font-bold" style={{ color: theme.primary }}>
             Komposisi Anggota Keluarga
           </h2>
           <p className="mt-0.5 text-xs text-slate-500">
@@ -70,14 +73,25 @@ export const FamilyCompositionPanel: React.FC<FamilyCompositionPanelProps> = ({
                   return (
                     <div
                       key={key}
-                      className={`flex items-center justify-between gap-2 rounded-lg border px-3 py-2 transition-colors ${
+                      className="flex items-center justify-between gap-2 rounded-lg border px-3 py-2 transition-all"
+                      style={
                         isActive
-                          ? 'border-[#0284c7]/40 bg-[#e0f2fe]/30'
-                          : 'border-slate-200 bg-white'
-                      }`}
+                          ? {
+                              backgroundColor: theme.tint,
+                              borderColor: theme.bright,
+                              boxShadow: `0 1px 4px ${theme.bright}33`,
+                            }
+                          : {
+                              backgroundColor: '#ffffff',
+                              borderColor: '#e2e8f0',
+                            }
+                      }
                     >
                       <div className="min-w-0">
-                        <div className="truncate text-xs font-semibold text-slate-800">
+                        <div
+                          className="truncate text-xs font-semibold"
+                          style={{ color: isActive ? theme.primary : '#1e293b' }}
+                        >
                           {meta.label}
                         </div>
                         {key === 'istri' && (
@@ -93,11 +107,18 @@ export const FamilyCompositionPanel: React.FC<FamilyCompositionPanelProps> = ({
                           onClick={() => onChangeCount(key, Math.max(0, value - 1))}
                           disabled={value <= 0}
                           aria-label={`Kurangi ${meta.label}`}
-                          className="flex h-8 w-8 items-center justify-center rounded-md border border-slate-200 bg-white text-slate-700 transition-colors hover:border-[#0284c7] hover:text-[#0284c7] disabled:cursor-not-allowed disabled:opacity-40"
+                          className="flex h-8 w-8 items-center justify-center rounded-md border border-slate-200 bg-white text-slate-700 transition-colors hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-40"
                         >
                           <Minus className="h-3.5 w-3.5" />
                         </button>
-                        <span className="font-mono-num w-6 text-center text-sm font-bold text-slate-900">
+                        <span
+                          className="font-mono-num flex h-7 min-w-[26px] items-center justify-center rounded-md px-1 text-center text-sm font-bold"
+                          style={
+                            isActive
+                              ? { backgroundColor: theme.bright, color: theme.brightText }
+                              : { color: '#0f172a' }
+                          }
+                        >
                           {value}
                         </span>
                         <button
@@ -105,7 +126,7 @@ export const FamilyCompositionPanel: React.FC<FamilyCompositionPanelProps> = ({
                           onClick={() => onChangeCount(key, Math.min(meta.max, value + 1))}
                           disabled={value >= meta.max}
                           aria-label={`Tambah ${meta.label}`}
-                          className="flex h-8 w-8 items-center justify-center rounded-md border border-slate-200 bg-white text-slate-700 transition-colors hover:border-[#0284c7] hover:bg-[#e0f2fe]/50 hover:text-[#1e3a8a] disabled:cursor-not-allowed disabled:opacity-40"
+                          className="flex h-8 w-8 items-center justify-center rounded-md border border-slate-200 bg-white text-slate-700 transition-colors hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-40"
                         >
                           <Plus className="h-3.5 w-3.5" />
                         </button>

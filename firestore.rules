@@ -1,0 +1,421 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // Global safety net: deny everything by default
+    match /{document=**} {
+      allow read, write: if false;
+    }
+
+    // -------------------------------------------------------------------------
+    // Shared Security Primitives
+    // -------------------------------------------------------------------------
+    function isValidId(id) {
+      return id is string && id.size() >= 1 && id.size() <= 128 && id.matches('^[a-zA-Z0-9_\\-]+$');
+    }
+
+    function incoming() {
+      return request.resource.data;
+    }
+
+    function existing() {
+      return resource.data;
+    }
+
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function isVerified() {
+      return isSignedIn() && request.auth.token.email_verified == true;
+    }
+
+    function isBootstrappedAdmin() {
+      return isVerified() && request.auth.token.email == 'lailynoorhidayah045@gmail.com';
+    }
+
+    function isAdmin() {
+      return isBootstrappedAdmin() || (
+        isVerified() && exists(/databases/$(database)/documents/admins/$(request.auth.uid))
+      );
+    }
+
+    function isOwner(ownerId) {
+      return isVerified() && request.auth.uid == ownerId;
+    }
+
+    // -------------------------------------------------------------------------
+    // Entity Validation Helpers (Validation Blueprints)
+    // -------------------------------------------------------------------------
+    function isValidUserPublicProfile(data) {
+      return data.keys().hasAll(['uid', 'displayName', 'role', 'createdAt', 'updatedAt'])
+        && data.keys().hasOnly(['uid', 'displayName', 'photoURL', 'role', 'createdAt', 'updatedAt'])
+        && isValidId(data.uid)
+        && data.displayName is string && data.displayName.size() >= 1 && data.displayName.size() <= 120
+        && (!('photoURL' in data) || (data.photoURL is string && data.photoURL.size() <= 500))
+        && data.role in ['user', 'admin']
+        && data.createdAt is timestamp
+        && data.updatedAt is timestamp;
+    }
+
+    function isValidUserPrivateInfo(data) {
+      return data.keys().hasAll(['uid', 'email', 'lastLoginAt'])
+        && data.keys().hasOnly(['uid', 'email', 'lastLoginAt'])
+        && isValidId(data.uid)
+        && data.email is string && data.email.size() >= 3 && data.email.size() <= 150
+        && data.lastLoginAt is timestamp;
+    }
+
+    function isValidAdminRecord(data) {
+      return data.keys().hasAll(['uid', 'email', 'addedBy', 'createdAt'])
+        && data.keys().hasOnly(['uid', 'email', 'label', 'addedBy', 'createdAt'])
+        && isValidId(data.uid)
+        && data.email is string && data.email.size() >= 3 && data.email.size() <= 150
+        && (!('label' in data) || (data.label is string && data.label.size() <= 120))
+        && isValidId(data.addedBy)
+        && data.createdAt is timestamp;
+    }
+
+    function isValidIdentityFields(mapData) {
+      return mapData is map
+        && mapData.keys().hasAll(['fullName', 'role', 'deceasedName', 'city', 'contact', 'notes'])
+        && mapData.keys().hasOnly(['fullName', 'role', 'deceasedName', 'city', 'contact', 'notes'])
+        && mapData.fullName is string && mapData.fullName.size() <= 120
+        && mapData.role is string && mapData.role.size() >= 1 && mapData.role.size() <= 80
+        && mapData.deceasedName is string && mapData.deceasedName.size() <= 120
+        && mapData.city is string && mapData.city.size() <= 100
+        && mapData.contact is string && mapData.contact.size() <= 120
+        && mapData.notes is string && mapData.notes.size() <= 500;
+    }
+
+    function isValidIdentitySubmission(data) {
+      return data.keys().hasAll([
+          'ownerId', 'fullName', 'role', 'deceasedName',
+          'city', 'contact', 'notes', 'createdAt', 'updatedAt'
+        ])
+        && data.keys().hasOnly([
+          'ownerId', 'ownerEmail', 'fullName', 'role', 'deceasedName',
+          'city', 'contact', 'notes', 'createdAt', 'updatedAt'
+        ])
+        && isValidId(data.ownerId)
+        && (!('ownerEmail' in data) || (data.ownerEmail is string && data.ownerEmail.size() <= 150))
+        && data.fullName is string && data.fullName.size() <= 120
+        && data.role is string && data.role.size() >= 1 && data.role.size() <= 80
+        && data.deceasedName is string && data.deceasedName.size() <= 120
+        && data.city is string && data.city.size() <= 100
+        && data.contact is string && data.contact.size() <= 120
+        && data.notes is string && data.notes.size() <= 500
+        && data.createdAt is timestamp
+        && data.updatedAt is timestamp;
+    }
+
+    function isValidFinancialsMap(fin) {
+      return fin is map
+        && fin.keys().hasAll(['grossAssets', 'debts', 'funeralCosts', 'willAmount'])
+        && fin.keys().hasOnly(['grossAssets', 'debts', 'funeralCosts', 'willAmount'])
+        && fin.grossAssets is number && fin.grossAssets >= 0
+        && fin.debts is number && fin.debts >= 0
+        && fin.funeralCosts is number && fin.funeralCosts >= 0
+        && fin.willAmount is number && fin.willAmount >= 0;
+    }
+
+    function isValidFamilyMap(fam) {
+      return fam is map
+        && fam.keys().hasAll([
+          'suami', 'istri', 'anakL', 'anakP', 'cucuL', 'cucuP', 'cicitL', 'cicitP',
+          'ibu', 'ayah', 'kakek', 'nenek', 'buyutL', 'buyutP',
+          'saudaraL', 'saudaraP', 'anakTiri', 'mertua', 'menantu'
+        ])
+        && fam.keys().hasOnly([
+          'suami', 'istri', 'anakL', 'anakP', 'cucuL', 'cucuP', 'cicitL', 'cicitP',
+          'ibu', 'ayah', 'kakek', 'nenek', 'buyutL', 'buyutP',
+          'saudaraL', 'saudaraP', 'anakTiri', 'mertua', 'menantu'
+        ])
+        && fam.suami is int && fam.suami >= 0 && fam.suami <= 1
+        && fam.istri is int && fam.istri >= 0 && fam.istri <= 4
+        && fam.anakL is int && fam.anakL >= 0 && fam.anakL <= 20
+        && fam.anakP is int && fam.anakP >= 0 && fam.anakP <= 20
+        && fam.cucuL is int && fam.cucuL >= 0 && fam.cucuL <= 20
+        && fam.cucuP is int && fam.cucuP >= 0 && fam.cucuP <= 20
+        && fam.cicitL is int && fam.cicitL >= 0 && fam.cicitL <= 20
+        && fam.cicitP is int && fam.cicitP >= 0 && fam.cicitP <= 20
+        && fam.ibu is int && fam.ibu >= 0 && fam.ibu <= 1
+        && fam.ayah is int && fam.ayah >= 0 && fam.ayah <= 1
+        && fam.kakek is int && fam.kakek >= 0 && fam.kakek <= 2
+        && fam.nenek is int && fam.nenek >= 0 && fam.nenek <= 2
+        && fam.buyutL is int && fam.buyutL >= 0 && fam.buyutL <= 4
+        && fam.buyutP is int && fam.buyutP >= 0 && fam.buyutP <= 4
+        && fam.saudaraL is int && fam.saudaraL >= 0 && fam.saudaraL <= 20
+        && fam.saudaraP is int && fam.saudaraP >= 0 && fam.saudaraP <= 20
+        && fam.anakTiri is int && fam.anakTiri >= 0 && fam.anakTiri <= 20
+        && fam.mertua is int && fam.mertua >= 0 && fam.mertua <= 4
+        && fam.menantu is int && fam.menantu >= 0 && fam.menantu <= 20;
+    }
+
+    function isValidInheritanceCase(data) {
+      return data.keys().hasAll([
+          'ownerId', 'ownerName', 'name', 'notes', 'currency', 'exchangeRate',
+          'legalSystem', 'deceasedGender', 'netEstateSnapshot',
+          'financials', 'family', 'identity', 'createdAt', 'updatedAt'
+        ])
+        && data.keys().hasOnly([
+          'ownerId', 'ownerName', 'name', 'notes', 'currency', 'exchangeRate',
+          'legalSystem', 'deceasedGender', 'netEstateSnapshot',
+          'financials', 'family', 'identity', 'createdAt', 'updatedAt'
+        ])
+        && isValidId(data.ownerId)
+        && data.ownerName is string && data.ownerName.size() <= 120
+        && data.name is string && data.name.size() >= 1 && data.name.size() <= 150
+        && data.notes is string && data.notes.size() <= 500
+        && data.currency in ['IDR', 'USD']
+        && data.exchangeRate is number && data.exchangeRate > 0
+        && data.legalSystem in ['islam', 'civil']
+        && data.deceasedGender in ['male', 'female']
+        && data.netEstateSnapshot is number && data.netEstateSnapshot >= 0
+        && isValidFinancialsMap(data.financials)
+        && isValidFamilyMap(data.family)
+        && isValidIdentityFields(data.identity)
+        && data.createdAt is timestamp
+        && data.updatedAt is timestamp;
+    }
+
+    function isValidCoachLog(data) {
+      return data.keys().hasAll(['ownerId', 'ownerName', 'question', 'answer', 'legalSystem', 'createdAt'])
+        && data.keys().hasOnly(['ownerId', 'ownerName', 'question', 'answer', 'legalSystem', 'createdAt'])
+        && isValidId(data.ownerId)
+        && data.ownerName is string && data.ownerName.size() <= 120
+        && data.question is string && data.question.size() >= 1 && data.question.size() <= 500
+        && data.answer is string && data.answer.size() >= 1 && data.answer.size() <= 5000
+        && data.legalSystem in ['islam', 'civil']
+        && data.createdAt is timestamp;
+    }
+
+    function isValidSimulationLog(data) {
+      return data.keys().hasAll([
+          'ownerId', 'ownerName', 'action', 'title', 'legalSystem',
+          'deceasedGender', 'currency', 'exchangeRate', 'netEstate',
+          'financials', 'family', 'identity', 'summaryText', 'createdAt'
+        ])
+        && data.keys().hasOnly([
+          'ownerId', 'ownerName', 'ownerEmail', 'action', 'title', 'legalSystem',
+          'deceasedGender', 'currency', 'exchangeRate', 'netEstate',
+          'financials', 'family', 'identity', 'summaryText', 'createdAt'
+        ])
+        && isValidId(data.ownerId)
+        && data.ownerName is string && data.ownerName.size() <= 120
+        && (!('ownerEmail' in data) || (data.ownerEmail is string && data.ownerEmail.size() <= 150))
+        && data.action is string && data.action.size() >= 1 && data.action.size() <= 120
+        && data.title is string && data.title.size() >= 1 && data.title.size() <= 150
+        && data.legalSystem in ['islam', 'civil']
+        && data.deceasedGender in ['male', 'female']
+        && data.currency in ['IDR', 'USD']
+        && data.exchangeRate is number && data.exchangeRate > 0
+        && data.netEstate is number && data.netEstate >= 0
+        && isValidFinancialsMap(data.financials)
+        && isValidFamilyMap(data.family)
+        && isValidIdentityFields(data.identity)
+        && data.summaryText is string && data.summaryText.size() <= 600
+        && data.createdAt is timestamp;
+    }
+
+    // -------------------------------------------------------------------------
+    // Collection Rules
+    // -------------------------------------------------------------------------
+
+    // Connection check document used at startup
+    match /test/connection {
+      allow get: if true;
+      allow list, write: if false;
+    }
+
+    // Public user profiles (PII isolated into /users/{userId}/private/info)
+    match /users/{userId} {
+      allow get: if isValidId(userId) && (isOwner(userId) || isAdmin());
+      allow list: if isAdmin();
+      allow create: if isVerified()
+        && isValidId(userId)
+        && isValidUserPublicProfile(incoming())
+        && incoming().createdAt == request.time
+        && incoming().updatedAt == request.time
+        && (
+          (request.auth.uid == userId && incoming().uid == request.auth.uid && incoming().role == 'user')
+          || isAdmin()
+        );
+      allow update: if isVerified()
+        && isValidId(userId)
+        && isValidUserPublicProfile(incoming())
+        && incoming().uid == existing().uid
+        && incoming().createdAt == existing().createdAt
+        && incoming().updatedAt == request.time
+        && (
+          isAdmin()
+          || (
+            request.auth.uid == userId
+            && incoming().role == existing().role
+            && incoming().diff(existing()).affectedKeys().hasOnly(['displayName', 'photoURL', 'updatedAt'])
+          )
+        );
+      allow delete: if isValidId(userId) && isAdmin();
+
+      // Private PII subcollection
+      match /private/{docId} {
+        allow get: if isValidId(userId) && isValidId(docId) && (isOwner(userId) || isAdmin());
+        allow list: if isVerified() && (existing().uid == request.auth.uid || isAdmin());
+        allow create: if isVerified()
+          && isValidId(userId)
+          && isValidId(docId)
+          && docId == 'info'
+          && isValidUserPrivateInfo(incoming())
+          && incoming().uid == userId
+          && incoming().lastLoginAt == request.time
+          && (request.auth.uid == userId || isAdmin())
+          && existsAfter(/databases/$(database)/documents/users/$(userId));
+        allow update: if isVerified()
+          && isValidId(userId)
+          && isValidId(docId)
+          && isValidUserPrivateInfo(incoming())
+          && incoming().uid == existing().uid
+          && incoming().lastLoginAt == request.time
+          && (
+            isAdmin()
+            || (
+              request.auth.uid == userId
+              && incoming().diff(existing()).affectedKeys().hasOnly(['email', 'lastLoginAt'])
+            )
+          );
+        allow delete: if isValidId(userId) && isValidId(docId) && (isOwner(userId) || isAdmin());
+      }
+    }
+
+    // Trusted Admin Allowlist
+    match /admins/{adminUid} {
+      allow get: if isValidId(adminUid) && (isAdmin() || (isVerified() && request.auth.uid == adminUid));
+      allow list: if isAdmin();
+      allow create: if isBootstrappedAdmin()
+        && isValidId(adminUid)
+        && isValidAdminRecord(incoming())
+        && incoming().uid == adminUid
+        && incoming().addedBy == request.auth.uid
+        && incoming().createdAt == request.time;
+      allow update: if isBootstrappedAdmin()
+        && isValidId(adminUid)
+        && isValidAdminRecord(incoming())
+        && incoming().uid == existing().uid
+        && incoming().addedBy == existing().addedBy
+        && incoming().createdAt == existing().createdAt
+        && incoming().diff(existing()).affectedKeys().hasOnly(['email', 'label']);
+      allow delete: if isBootstrappedAdmin() && isValidId(adminUid) && adminUid != request.auth.uid;
+    }
+
+    // Identity submissions (from pre-start popup)
+    match /identities/{identityId} {
+      allow get: if isValidId(identityId) && (isOwner(existing().ownerId) || isAdmin());
+      allow list: if isVerified() && (existing().ownerId == request.auth.uid || isAdmin());
+      allow create: if isVerified()
+        && isValidId(identityId)
+        && isValidIdentitySubmission(incoming())
+        && incoming().ownerId == request.auth.uid
+        && incoming().createdAt == request.time
+        && incoming().updatedAt == request.time;
+      allow update: if isVerified()
+        && isValidId(identityId)
+        && isValidIdentitySubmission(incoming())
+        && incoming().ownerId == existing().ownerId
+        && incoming().createdAt == existing().createdAt
+        && incoming().updatedAt == request.time
+        && (
+          isAdmin()
+          || (
+            isOwner(existing().ownerId)
+            && incoming().diff(existing()).affectedKeys().hasOnly([
+              'ownerEmail', 'fullName', 'role', 'deceasedName', 'city', 'contact', 'notes', 'updatedAt'
+            ])
+          )
+        );
+      allow delete: if isValidId(identityId) && (isOwner(existing().ownerId) || isAdmin());
+    }
+
+    // Inheritance simulation cases
+    match /cases/{caseId} {
+      allow get: if isValidId(caseId) && (isOwner(existing().ownerId) || isAdmin());
+      allow list: if isVerified() && (existing().ownerId == request.auth.uid || isAdmin());
+      allow create: if isVerified()
+        && isValidId(caseId)
+        && isValidInheritanceCase(incoming())
+        && incoming().ownerId == request.auth.uid
+        && incoming().createdAt == request.time
+        && incoming().updatedAt == request.time;
+      allow update: if isVerified()
+        && isValidId(caseId)
+        && isValidInheritanceCase(incoming())
+        && incoming().ownerId == existing().ownerId
+        && incoming().createdAt == existing().createdAt
+        && incoming().updatedAt == request.time
+        && (
+          isAdmin()
+          || (
+            isOwner(existing().ownerId)
+            && incoming().diff(existing()).affectedKeys().hasOnly([
+              'ownerName', 'name', 'notes', 'currency', 'exchangeRate',
+              'legalSystem', 'deceasedGender', 'netEstateSnapshot',
+              'financials', 'family', 'identity', 'updatedAt'
+            ])
+          )
+        );
+      allow delete: if isValidId(caseId) && (isOwner(existing().ownerId) || isAdmin());
+    }
+
+    // AI Legal Coach consultation logs
+    match /coachLogs/{logId} {
+      allow get: if isValidId(logId) && (isOwner(existing().ownerId) || isAdmin());
+      allow list: if isVerified() && (existing().ownerId == request.auth.uid || isAdmin());
+      allow create: if isVerified()
+        && isValidId(logId)
+        && isValidCoachLog(incoming())
+        && incoming().ownerId == request.auth.uid
+        && incoming().createdAt == request.time;
+      allow update: if isVerified()
+        && isValidId(logId)
+        && isValidCoachLog(incoming())
+        && incoming().ownerId == existing().ownerId
+        && incoming().createdAt == existing().createdAt
+        && (
+          isAdmin()
+          || (
+            isOwner(existing().ownerId)
+            && incoming().diff(existing()).affectedKeys().hasOnly(['ownerName', 'question', 'answer', 'legalSystem'])
+          )
+        );
+      allow delete: if isValidId(logId) && (isOwner(existing().ownerId) || isAdmin());
+    }
+
+    // User simulation activity logs
+    match /simulationLogs/{logId} {
+      allow get: if isValidId(logId) && (isOwner(existing().ownerId) || isAdmin());
+      allow list: if isVerified() && (existing().ownerId == request.auth.uid || isAdmin());
+      allow create: if isVerified()
+        && isValidId(logId)
+        && isValidSimulationLog(incoming())
+        && incoming().ownerId == request.auth.uid
+        && incoming().createdAt == request.time;
+      allow update: if isVerified()
+        && isValidId(logId)
+        && isValidSimulationLog(incoming())
+        && incoming().ownerId == existing().ownerId
+        && incoming().createdAt == existing().createdAt
+        && (
+          isAdmin()
+          || (
+            isOwner(existing().ownerId)
+            && incoming().diff(existing()).affectedKeys().hasOnly([
+              'ownerName', 'action', 'title', 'legalSystem', 'deceasedGender',
+              'currency', 'exchangeRate', 'netEstate', 'financials', 'family',
+              'identity', 'summaryText'
+            ])
+          )
+        );
+      allow delete: if isValidId(logId) && (isOwner(existing().ownerId) || isAdmin());
+    }
+  }
+}

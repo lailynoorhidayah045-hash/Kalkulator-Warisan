@@ -63,4 +63,28 @@
   table {
     font-size: 11px !important;
   }
+
+  .admin-print-sheet {
+    display: none !important;
+  }
+
+  .admin-print-mode .simulator-workspace,
+  .admin-print-mode .admin-screen-ui,
+  .admin-print-mode header,
+  .admin-print-mode footer,
+  .admin-print-mode .print-only {
+    display: none !important;
+  }
+
+  .admin-print-mode .admin-print-sheet {
+    display: block !important;
+    padding: 0 !important;
+    margin: 0 !important;
+  }
+}
+
+@media screen {
+  .admin-print-sheet {
+    display: none;
+  }
 }

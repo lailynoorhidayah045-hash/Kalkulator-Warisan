@@ -5,10 +5,13 @@ import {
   generateLegalCoachResponse,
   QUICK_COACH_QUESTIONS,
 } from '../modules/aiLegalCoach';
+import { AppTheme } from '../modules/themes';
 
 interface AiLegalCoachPanelProps {
   state: AppState;
   result: CalculationResult;
+  theme: AppTheme;
+  onLogInteraction?: (question: string, answer: string) => void;
 }
 
 const INITIAL_MESSAGE: ChatMessage = {
@@ -19,7 +22,7 @@ const INITIAL_MESSAGE: ChatMessage = {
   timestamp: new Date().toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' }),
 };
 
-function renderFormattedText(text: string): React.ReactNode {
+function renderFormattedText(text: string, primaryColor: string, tintColor: string): React.ReactNode {
   const paragraphs = text.split('\n\n');
   return paragraphs.map((para, pIdx) => {
     const parts = para.split(/(\*\*[^*]+\*\*|\*[^*]+\*|`[^`]+`)/g);
@@ -44,7 +47,8 @@ function renderFormattedText(text: string): React.ReactNode {
             return (
               <code
                 key={idx}
-                className="font-mono-num rounded bg-sky-100/80 px-1 py-0.5 text-[11px] font-medium text-[#1e3a8a]"
+                className="font-mono-num rounded px-1 py-0.5 text-[11px] font-medium"
+                style={{ backgroundColor: tintColor, color: primaryColor }}
               >
                 {part.slice(1, -1)}
               </code>
@@ -60,6 +64,8 @@ function renderFormattedText(text: string): React.ReactNode {
 export const AiLegalCoachPanel: React.FC<AiLegalCoachPanelProps> = ({
   state,
   result,
+  theme,
+  onLogInteraction,
 }) => {
   const [messages, setMessages] = useState<ChatMessage[]>([INITIAL_MESSAGE]);
   const [input, setInput] = useState('');
@@ -96,6 +102,9 @@ export const AiLegalCoachPanel: React.FC<AiLegalCoachPanelProps> = ({
     };
 
     setMessages((prev) => [...prev, userMsg, coachMsg]);
+    if (onLogInteraction) {
+      onLogInteraction(question, replyText);
+    }
     if (!overrideText) setInput('');
   };
 
@@ -110,11 +119,14 @@ export const AiLegalCoachPanel: React.FC<AiLegalCoachPanelProps> = ({
     <section className="no-print rounded-xl border border-slate-200 bg-white p-5 shadow-xs sm:p-6">
       <div className="flex items-center justify-between gap-3 border-b border-slate-100 pb-3.5">
         <div className="flex items-center gap-2.5">
-          <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-[#e0f2fe] text-[#1e3a8a]">
+          <div
+            className="flex h-9 w-9 items-center justify-center rounded-lg"
+            style={{ backgroundColor: theme.tint, color: theme.primary }}
+          >
             <Scale className="h-4.5 w-4.5" />
           </div>
           <div>
-            <h2 className="text-base font-bold text-[#1e3a8a]">
+            <h2 className="text-base font-bold" style={{ color: theme.primary }}>
               AI Legal Coach Interaktif
             </h2>
             <p className="text-xs text-slate-500">
@@ -142,7 +154,12 @@ export const AiLegalCoachPanel: React.FC<AiLegalCoachPanelProps> = ({
             key={q}
             type="button"
             onClick={() => handleSend(q)}
-            className="rounded-lg border border-sky-200/80 bg-[#e0f2fe]/45 px-2.5 py-1.5 text-left text-xs font-medium text-[#1e3a8a] transition-colors hover:border-[#0284c7] hover:bg-[#e0f2fe]"
+            className="rounded-lg border px-2.5 py-1.5 text-left text-xs font-medium transition-opacity hover:opacity-85"
+            style={{
+              backgroundColor: theme.tint,
+              borderColor: theme.border,
+              color: theme.primary,
+            }}
           >
             {q}
           </button>
@@ -164,11 +181,18 @@ export const AiLegalCoachPanel: React.FC<AiLegalCoachPanelProps> = ({
             <div
               className={`max-w-[92%] rounded-xl px-3.5 py-2.5 text-xs leading-relaxed ${
                 msg.role === 'user'
-                  ? 'bg-[#1e3a8a] text-white'
+                  ? 'text-white'
                   : 'border border-slate-200 bg-white text-slate-700'
               }`}
+              style={
+                msg.role === 'user'
+                  ? { backgroundColor: theme.primary }
+                  : undefined
+              }
             >
-              {msg.role === 'user' ? msg.content : renderFormattedText(msg.content)}
+              {msg.role === 'user'
+                ? msg.content
+                : renderFormattedText(msg.content, theme.primary, theme.tint)}
             </div>
             <span className="mt-1 px-1 text-[10px] text-slate-400">
               {msg.role === 'user' ? 'Anda' : 'AI Legal Coach'} · {msg.timestamp}
@@ -185,12 +209,13 @@ export const AiLegalCoachPanel: React.FC<AiLegalCoachPanelProps> = ({
           onChange={(e) => setInput(e.target.value)}
           onKeyDown={handleKeyDown}
           placeholder="Tanyakan hukum waris (misal: mengapa saudara terhalang, apa itu 'Aul)..."
-          className="h-10 flex-1 rounded-lg border border-slate-300 bg-white px-3.5 text-sm text-slate-900 placeholder:text-slate-400 focus:border-[#0284c7] focus:outline-none focus:ring-2 focus:ring-[#0284c7]/20"
+          className="h-10 flex-1 rounded-lg border border-slate-300 bg-white px-3.5 text-sm text-slate-900 placeholder:text-slate-400 focus:outline-none focus:ring-2"
         />
         <button
           type="button"
           onClick={() => handleSend()}
-          className="inline-flex h-10 items-center gap-1.5 whitespace-nowrap rounded-lg bg-[#0284c7] px-4 text-sm font-semibold text-white transition-colors hover:bg-[#0369a1] focus-visible:outline-2 focus-visible:outline-[#1e3a8a]"
+          className="inline-flex h-10 items-center gap-1.5 whitespace-nowrap rounded-lg px-4 text-sm font-semibold transition-opacity hover:opacity-90"
+          style={{ backgroundColor: theme.bright, color: theme.brightText }}
         >
           <Send className="h-4 w-4" />
           Kirim

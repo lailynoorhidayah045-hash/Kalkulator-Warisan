@@ -92,6 +92,54 @@ export interface SavedCase {
   savedAt: string;
   state: AppState;
   netEstateSnapshot: number;
+  source?: 'local' | 'firestore';
+  ownerId?: string;
+  ownerName?: string;
+}
+
+export interface FirestoreIdentityRecord extends UserIdentity {
+  id: string;
+  ownerId: string;
+  ownerEmail?: string;
+  createdAtMs: number;
+  updatedAtMs: number;
+}
+
+export interface FirestoreCoachLog {
+  id: string;
+  ownerId: string;
+  ownerName: string;
+  question: string;
+  answer: string;
+  legalSystem: LegalSystem;
+  createdAtMs: number;
+}
+
+export interface FirestoreSimulationLog {
+  id: string;
+  ownerId: string;
+  ownerName: string;
+  ownerEmail?: string;
+  action: string;
+  title: string;
+  legalSystem: LegalSystem;
+  deceasedGender: DeceasedGender;
+  currency: CurrencyCode;
+  exchangeRate: number;
+  netEstate: number;
+  financials: FinancialInputs;
+  family: FamilyCounts;
+  identity: UserIdentity;
+  summaryText: string;
+  createdAtMs: number;
+}
+
+export interface FirestoreAdminRecord {
+  uid: string;
+  email: string;
+  label?: string;
+  addedBy: string;
+  createdAtMs: number;
 }
 
 export interface ChatMessage {
