@@ -1,5 +1,14 @@
 import React, { useEffect, useState } from 'react';
-import { LogIn, ShieldCheck, X, AlertCircle } from 'lucide-react';
+import {
+  AlertCircle,
+  Check,
+  Copy,
+  ExternalLink,
+  LogIn,
+  ShieldCheck,
+  X,
+} from 'lucide-react';
+import firebaseConfig from '../../firebase-applet-config.json';
 
 interface AuthModalProps {
   isOpen: boolean;
@@ -14,10 +23,14 @@ export const AuthModal: React.FC<AuthModalProps> = ({
 }) => {
   const [loading, setLoading] = useState(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
+  const [unauthorizedHost, setUnauthorizedHost] = useState<string | null>(null);
+  const [copiedHost, setCopiedHost] = useState(false);
 
   useEffect(() => {
     if (!isOpen) return;
     setErrorMsg(null);
+    setUnauthorizedHost(null);
+    setCopiedHost(false);
     const onKeyDown = (e: KeyboardEvent) => {
       if (e.key === 'Escape') onClose();
     };
@@ -30,6 +43,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({
   const handleLogin = async () => {
     setLoading(true);
     setErrorMsg(null);
+    setUnauthorizedHost(null);
     try {
       await onGoogleLogin();
       onClose();
@@ -38,11 +52,15 @@ export const AuthModal: React.FC<AuthModalProps> = ({
       if (msg.includes('popup-closed-by-user')) {
         setErrorMsg('Jendela login Google ditutup sebelum selesai.');
       } else if (msg.includes('auth/popup-blocked')) {
-        setErrorMsg('Pop-up login diblokir oleh browser. Izinkan pop-up untuk situs ini lalu coba lagi.');
-      } else if (msg.includes('auth/unauthorized-domain')) {
-        const currentHost = typeof window !== 'undefined' ? window.location.hostname : '';
         setErrorMsg(
-          `Domain "${currentHost}" belum terdaftar di Authorized Domains Firebase Auth. Muat ulang halaman atau tambahkan domain ini di Firebase Console → Authentication → Settings → Authorized domains.`
+          'Pop-up login diblokir oleh browser. Izinkan pop-up untuk situs ini lalu coba lagi.'
+        );
+      } else if (msg.includes('auth/unauthorized-domain')) {
+        const currentHost =
+          typeof window !== 'undefined' ? window.location.hostname : '';
+        setUnauthorizedHost(currentHost);
+        setErrorMsg(
+          `Domain "${currentHost}" belum terdaftar di Authorized Domains Firebase Auth.`
         );
       } else {
         setErrorMsg(`Login gagal: ${msg}`);
@@ -51,6 +69,19 @@ export const AuthModal: React.FC<AuthModalProps> = ({
       setLoading(false);
     }
   };
+
+  const handleCopyHost = async () => {
+    if (!unauthorizedHost) return;
+    try {
+      await navigator.clipboard.writeText(unauthorizedHost);
+      setCopiedHost(true);
+      window.setTimeout(() => setCopiedHost(false), 2500);
+    } catch {
+      // ignore clipboard errors
+    }
+  };
+
+  const firebaseAuthSettingsUrl = `https://console.firebase.google.com/project/${firebaseConfig.projectId}/authentication/settings`;
 
   return (
     <div
@@ -96,9 +127,51 @@ export const AuthModal: React.FC<AuthModalProps> = ({
           </div>
 
           {errorMsg && (
-            <div className="flex items-start gap-2 rounded-lg border border-red-200 bg-red-50 p-3 text-xs text-red-800">
-              <AlertCircle className="mt-0.5 h-4 w-4 shrink-0 text-red-600" />
-              <span>{errorMsg}</span>
+            <div className="space-y-2.5 rounded-lg border border-red-200 bg-red-50 p-3.5 text-xs text-red-900">
+              <div className="flex items-start gap-2">
+                <AlertCircle className="mt-0.5 h-4 w-4 shrink-0 text-red-600" />
+                <span className="font-medium">{errorMsg}</span>
+              </div>
+
+              {unauthorizedHost && (
+                <div className="space-y-2 border-t border-red-200/80 pt-2.5 text-[11px] leading-relaxed text-red-800">
+                  <p>
+                    Karena Anda menjalankan aplikasi di domain eksternal, tambahkan domain berikut ke{' '}
+                    <strong>Authentication → Settings → Authorized domains</strong> pada Firebase Console:
+                  </p>
+                  <div className="flex items-center justify-between gap-2 rounded-md border border-red-200 bg-white px-2.5 py-1.5">
+                    <code className="font-mono-num truncate font-semibold text-slate-900">
+                      {unauthorizedHost}
+                    </code>
+                    <button
+                      type="button"
+                      onClick={() => void handleCopyHost()}
+                      className="inline-flex shrink-0 items-center gap-1 rounded bg-slate-100 px-2 py-1 text-[11px] font-semibold text-slate-700 hover:bg-slate-200"
+                    >
+                      {copiedHost ? (
+                        <>
+                          <Check className="h-3 w-3 text-emerald-600" />
+                          Tersalin
+                        </>
+                      ) : (
+                        <>
+                          <Copy className="h-3 w-3" />
+                          Salin
+                        </>
+                      )}
+                    </button>
+                  </div>
+                  <a
+                    href={firebaseAuthSettingsUrl}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="inline-flex items-center gap-1 font-semibold text-[#1e3a8a] underline hover:text-[#0284c7]"
+                  >
+                    Buka Authorized Domains di Firebase Console
+                    <ExternalLink className="h-3 w-3" />
+                  </a>
+                </div>
+              )}
             </div>
           )}
 
