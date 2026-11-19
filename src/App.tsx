@@ -320,6 +320,21 @@ export function App() {
       : result.netEstate * state.exchangeRate;
   }, [result.netEstate, state.currency, state.exchangeRate]);
 
+  // Live parsed draft exchange rate for instant conversion preview
+  const liveDraftRate = useMemo(() => {
+    const cleaned = draftRate.replace(/[^\d.,]/g, '').replace(/\./g, '').replace(',', '.');
+    const parsed = parseFloat(cleaned);
+    return Number.isFinite(parsed) && parsed > 0 ? Math.round(parsed) : state.exchangeRate;
+  }, [draftRate, state.exchangeRate]);
+
+  // Automatic conversion of "Jumlah Harta yang Dimiliki (Jika Seluruhnya Diuangkan)"
+  const convertedGrossAssets = useMemo(() => {
+    if (liveDraftRate <= 0) return 0;
+    return state.currency === 'IDR'
+      ? state.financials.grossAssets / liveDraftRate
+      : state.financials.grossAssets * liveDraftRate;
+  }, [state.financials.grossAssets, state.currency, liveDraftRate]);
+
   // Cases displayed in SavedCasesPanel (Firestore for logged-in user, localStorage otherwise)
   const displayedCases = useMemo(() => {
     if (currentUser && currentUser.emailVerified) {
@@ -951,60 +966,117 @@ export function App() {
                 </div>
               </div>
 
-              {/* Independent Exchange Rate Input + Submit Button */}
+              {/* Unified Monetized Estate + Independent Exchange Rate Converter */}
               <form
                 onSubmit={handleApplyRate}
-                className="rounded-lg border p-3.5"
+                className="space-y-3 rounded-lg border p-3.5"
                 style={{
                   backgroundColor: theme.tint,
                   borderColor: theme.border,
                 }}
               >
-                <label
-                  htmlFor="exchange-rate-input"
-                  className="mb-1.5 flex items-center gap-1.5 text-xs font-semibold"
-                  style={{ color: theme.primary }}
-                >
-                  <ArrowRightLeft className="h-3.5 w-3.5" />
-                  Konversi Kurs Mandiri (1 USD = Rp ...)
-                </label>
-                <div className="flex items-center gap-2">
-                  <div className="relative flex-1">
-                    <span className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-xs font-semibold text-slate-500">
-                      Rp
+                {/* Total Monetized Assets Input -> Automatically feeds into Exchange Rate Conversion */}
+                <div>
+                  <label
+                    htmlFor="monetized-assets-input"
+                    className="mb-1.5 block text-xs font-semibold"
+                    style={{ color: theme.primary }}
+                  >
+                    Jumlah Harta yang Dimiliki (Jika Seluruhnya Diuangkan)
+                  </label>
+                  <div className="relative">
+                    <span className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-xs font-bold text-slate-500">
+                      {state.currency === 'IDR' ? 'Rp' : '$'}
                     </span>
                     <input
-                      id="exchange-rate-input"
+                      id="monetized-assets-input"
                       type="text"
-                      inputMode="numeric"
-                      value={draftRate}
-                      onChange={(e) => setDraftRate(e.target.value)}
+                      inputMode="decimal"
+                      value={formatInputNumber(state.financials.grossAssets, state.currency)}
+                      onChange={(e) => handleFinancialChange('grossAssets', e.target.value)}
                       className="font-mono-num h-10 w-full rounded-lg border border-slate-300 bg-white pl-9 pr-3 text-sm font-semibold text-slate-900 focus:outline-none focus:ring-2"
                     />
                   </div>
-                  <button
-                    type="submit"
-                    className="inline-flex h-10 items-center gap-1.5 whitespace-nowrap rounded-lg px-3.5 text-xs font-bold transition-opacity hover:opacity-90"
-                    style={{ backgroundColor: theme.bright, color: theme.brightText }}
-                  >
-                    <RefreshCw className="h-3.5 w-3.5" />
-                    Terapkan Kurs
-                  </button>
+                  <p className="mt-1 text-[11px] text-slate-600">
+                    Otomatis masuk ke konversi kurs &amp; sinkron dengan Total Harta Kotor.
+                  </p>
                 </div>
-                <div className="mt-2 flex flex-wrap items-center justify-between gap-1 text-[11px] text-slate-600">
+
+                {/* Exchange Rate Input + Apply Button */}
+                <div className="border-t border-slate-200/70 pt-3">
+                  <label
+                    htmlFor="exchange-rate-input"
+                    className="mb-1.5 flex items-center gap-1.5 text-xs font-semibold"
+                    style={{ color: theme.primary }}
+                  >
+                    <ArrowRightLeft className="h-3.5 w-3.5" />
+                    Konversi Kurs Mandiri (1 USD = Rp ...)
+                  </label>
+                  <div className="flex items-center gap-2">
+                    <div className="relative flex-1">
+                      <span className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-xs font-semibold text-slate-500">
+                        Rp
+                      </span>
+                      <input
+                        id="exchange-rate-input"
+                        type="text"
+                        inputMode="numeric"
+                        value={draftRate}
+                        onChange={(e) => setDraftRate(e.target.value)}
+                        className="font-mono-num h-10 w-full rounded-lg border border-slate-300 bg-white pl-9 pr-3 text-sm font-semibold text-slate-900 focus:outline-none focus:ring-2"
+                      />
+                    </div>
+                    <button
+                      type="submit"
+                      className="inline-flex h-10 items-center gap-1.5 whitespace-nowrap rounded-lg px-3.5 text-xs font-bold transition-opacity hover:opacity-90"
+                      style={{ backgroundColor: theme.bright, color: theme.brightText }}
+                    >
+                      <RefreshCw className="h-3.5 w-3.5" />
+                      Terapkan Kurs
+                    </button>
+                  </div>
+                </div>
+
+                {/* Live Automatic Conversion Result Box */}
+                <div className="grid grid-cols-1 gap-2 rounded-lg border border-slate-200/80 bg-white/85 p-2.5 sm:grid-cols-2">
+                  <div>
+                    <div className="text-[10px] font-semibold uppercase tracking-wide text-slate-500">
+                      Harta Diuangkan ({state.currency})
+                    </div>
+                    <div className="font-mono-num mt-0.5 text-xs font-bold text-slate-900">
+                      {formatCurrency(state.financials.grossAssets, state.currency)}
+                    </div>
+                  </div>
+                  <div className="sm:text-right">
+                    <div className="text-[10px] font-semibold uppercase tracking-wide text-slate-500">
+                      Hasil Konversi Kurs ({state.currency === 'IDR' ? 'USD' : 'IDR'})
+                    </div>
+                    <div className="font-mono-num mt-0.5 text-xs font-bold" style={{ color: theme.primary }}>
+                      {formatCurrency(convertedGrossAssets, state.currency === 'IDR' ? 'USD' : 'IDR')}
+                    </div>
+                  </div>
+                </div>
+
+                <div className="flex flex-wrap items-center justify-between gap-1 text-[11px] text-slate-600">
                   <span>
                     Kurs aktif:{' '}
                     <strong className="font-mono-num" style={{ color: theme.primary }}>
                       1 USD = {formatRateIdr(state.exchangeRate)}
                     </strong>
+                    {liveDraftRate !== state.exchangeRate && (
+                      <span className="ml-1 text-amber-700">
+                        (Pratinjau: {formatRateIdr(liveDraftRate)})
+                      </span>
+                    )}
                   </span>
                   <span className="font-mono-num text-slate-600">
-                    ≈ {formatCurrency(alternateNetEstate, state.currency === 'IDR' ? 'USD' : 'IDR')}
+                    Harta Bersih ≈{' '}
+                    {formatCurrency(alternateNetEstate, state.currency === 'IDR' ? 'USD' : 'IDR')}
                   </span>
                 </div>
                 {rateFeedback && (
                   <p
-                    className="mt-1.5 flex items-start gap-1.5 text-[11px] font-medium"
+                    className="flex items-start gap-1.5 text-[11px] font-medium"
                     style={{ color: theme.primary }}
                   >
                     <CheckCircle2 className="mt-0.5 h-3.5 w-3.5 shrink-0" />
